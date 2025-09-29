@@ -1,0 +1,126 @@
+//--------------------------------------------------
+//Purpose: The purpose of this project is to configure a photoresistor, passive buzzer, and RGB LED 
+//  with the ESP8266. When the photoresistor detects lux below a certain threshold, the buzzer will 
+//  sound. The RGB LED will go from white to red the higher the light intensity. When you type "b" 
+//  or "B" into the terminal than the buzzer will sound for 5 seconds.
+//Inputs:  Analog voltage detected from A0 pin, "B" or "b" will sound the buzzer for 5 seconds
+//Outputs: Lux reading, voltage reading, sound, LED colors 
+//Date: September 28, 2025
+//Compiler: Arduino IDE
+//Author: Kamryn Shigemoto
+//Versions:
+//          V1 - original version
+//--------------------------------------------------
+//File Dependencies:
+//--------------------------------------------------
+//No external libraries were included in this code.
+//--------------------------------------------------
+//Main Program
+//--------------------------------------------------
+#include <Arduino.h>
+
+
+#define LDR_PIN A0 // LDR connected to analog input A0
+#define BUZZER_PIN D1 // Passive buzzer pin, was D1
+#define RED_PIN D5 // RGB LED Red pin
+#define GREEN_PIN D6 // RGB LED Green pin
+#define BLUE_PIN D7 // RGB LED Blue pin
+
+int luxThreshold = 350; // Calibrate this using phone lux app (room light), 200
+
+void setup() {
+Serial.begin(9600); //was 115200
+
+pinMode(BUZZER_PIN, OUTPUT);
+pinMode(RED_PIN, OUTPUT);
+pinMode(GREEN_PIN, OUTPUT);
+pinMode(BLUE_PIN, OUTPUT);
+}
+
+// Set RGB LED color (0–1023 PWM for ESP8266)
+void setColor(int red, int green, int blue) {
+analogWrite(RED_PIN, red);
+analogWrite(GREEN_PIN, green);
+analogWrite(BLUE_PIN, blue);
+}
+
+void loop() {
+// Read LDR value (0-1023)
+int ldrValue = analogRead(LDR_PIN); //0-1023
+//Serial.print(ldrValue);
+//int changed_ldrValue = 1023 - ldrValue; // because lux was increasing in dark
+//int new_ldrValue = changed_ldrValue * (338/165); //ldrvalue*(phone lux/photoresister lux), 338
+//if (new_ldrValue < 0) new_ldrValue = 0;
+if (ldrValue < 0) ldrValue = 0;
+
+//Calculate Lux based on polynomial regression line
+float Vref = 3.3;
+//float voltage = (ldrValue / 1023.0) * Vref; // Convert to volts 
+float adjvoltage = (((ldrValue)-400.0)/(1024.0-400.0)) * Vref; //(ldr-lower ADC bound (dark)), (1024-400) --> (bright - dark), room around 938
+float voltagesquared = sq(adjvoltage);
+float lux = (1527.5*(voltagesquared))-(4256.1*(adjvoltage))+575.23;
+//float adjlux = (lux/1500)*400; //calculated lux divided by output * threshold
+//float lux = (1263*voltagesquared)-(3597.2*adjvoltage)+36.294;
+if (lux < 0) lux = 0;
+
+
+// Map to Lux approx (0-1000 Lux) - adjust after calibration
+//float lux = map(ldrValue, 0, 1023, 0, 1000);
+
+// Print Lux
+Serial.print("Lux: ");
+//Serial.println(lux);
+Serial.println(lux);
+
+// Threshold check
+if (lux < luxThreshold) {
+tone(BUZZER_PIN, 1000); // Passive buzzer sound (1kHz)
+setColor(1023, 1023, 1023); // White
+} else {
+noTone(BUZZER_PIN); // Stop buzzer
+// More Lux → more red
+int redVal = map(lux, luxThreshold, 800, 0, 1023);
+if (redVal > 1023) redVal = 1023;
+setColor(1023, 1023 - redVal, 1023 - redVal); // changes red, green, and blue values
+}
+
+// Check for serial input (B to test buzzer)
+if (Serial.available()) {
+char c = Serial.read();
+if (c == 'B' || c == 'b') {
+Serial.println("Buzzer Test for 5 seconds...");
+tone(BUZZER_PIN, 1000);
+delay(5000);
+noTone(BUZZER_PIN);
+}
+}
+
+delay(1000);
+}
+
+//above is code for reading lux from photoresistor, creating circuit with buzzer and rgb
+
+//below is code for reading voltages
+/*
+#define LDR_PIN A0 // LDR module connected to A0
+float Vref = 3.3; // NodeMCU uses 0–3.3V input range
+
+void setup() {
+Serial.begin(9600);
+Serial.println("Format: ADC_Value, Voltage(V)");
+}
+
+void loop() {
+int rawValue = analogRead(LDR_PIN); // 0–1023
+float voltage = (rawValue / 1023.0) * Vref; // Convert to volts
+
+// Print both values for logging
+Serial.print("ADC: ");
+Serial.print(rawValue);
+Serial.print(" Voltage: ");
+Serial.print(voltage, 3); // 3 decimal places
+Serial.println(" V");
+
+delay(2000); // Take a reading every 2 seconds
+}
+*/
