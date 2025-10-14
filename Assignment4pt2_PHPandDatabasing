@@ -1,0 +1,297 @@
+**Code to Display Data Tables and Graph (displaydatatables.php)**
+**URL: https://kshigemotoee.com/displaydatatables.php**
+<?php
+// get database credentials to connect to MySQL database
+$host = 'localhost';
+$dbname = 'u764227866_kshigemoto';
+$username = 'u764227866_db_kshigemoto';
+$password = 'ee@SSU2025';
+
+// create PDO (php data object) to connect to database
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);  //throw exception if something goes wrong
+    
+    // get sensor_register data
+    $registerQuery = "SELECT node_name, manufacturer, longitude, latitude FROM sensor_register ORDER BY node_name ASC";  
+        //takes data from sensor_register and orders in ascending order by node name
+    $registerStmt = $pdo->prepare($registerQuery);
+        //get query ready to execute, returns statement object
+    $registerStmt->execute();
+        //runs the prepared query
+    $registerData = $registerStmt->fetchAll(PDO::FETCH_ASSOC);
+        //retrieves all the rows returned from the query in associative array
+        
+    // get sensor_data data
+    $dataQuery = "SELECT node_name, time_received, temperature, humidity FROM sensor_data ORDER BY node_name ASC, time_received ASC";
+        //takes data from sensor_data and orders in ascending order by node name and time time_received
+    $dataStmt = $pdo->prepare($dataQuery);
+        //get query ready to execute to extract data
+    $dataStmt->execute();
+        //run the prepared query
+    $dataResults = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+        //retrieves all the rows returned from the query in associative array
+        
+    // calculate average temperature and humidity for node 1 from sensor data table
+    $averageQuery = "SELECT AVG(temperature) AS avg_temp, AVG(humidity) AS avg_humidity FROM sensor_data WHERE node_name = 'node_1'";
+        //get average temperature and humidity from sensor data table and store as variables
+    $averageStmt = $pdo->prepare($averageQuery);
+        //get average query ready to execute
+    $averageStmt->execute();
+        //run the prepared query
+    $averageResult = $averageStmt->fetch(PDO::FETCH_ASSOC);
+        //retrieve data returned as associative array
+        
+    // get data from node 1 to graph
+    $graphQuery = "SELECT time_received, temperature FROM sensor_data WHERE node_name = 'node_1' ORDER BY time_received ASC";
+        // get time and temperature data from node in ascending order for the graph
+    $graphStmt = $pdo->prepare($graphQuery);
+    $graphStmt->execute();
+        //run the query
+    $graphData = $graphStmt->fetchAll(PDO::FETCH_ASSOC);
+        //retrieve all the query data and return as associative array
+        
+    // get data from node 1 to display in JSON format
+    //$node1Query = "SELECT node_name, time_received, temperature, humidity FROM sensor_data WHERE node_name = 'node_1' ORDER BY time_received ASC";
+    //$node1Stmt = $pdo->prepare($node1Query);
+    //$node1Stmt->execute();
+    //$node1Data = $node1Stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // output node 1 data as JSON
+    //header('Content-Type: application/json');
+    //echo json_encode($node1Data, JSON_PRETTY_PRINT);
+    
+    }
+    
+catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+    //PDOException is a special type of error related to database operations with PDO, $e is the variable that holds the error object
+    //die stops the script then will display message with actual error
+}
+
+// prepare data for Google Charts
+$dataArray = [['Time Received', 'Temperature']];
+foreach ($graphData as $row) {
+    $dataArray[] = [$row['time_received'], (float) $row['temperature']];
+}
+
+//convert data to JSON
+$dataJSON = json_encode($dataArray);
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome to SSU IoT Lab</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: white;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #003366;
+        }
+        
+        h2 {
+            color: #0055aa;
+            margin-top: 40px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        th, td {
+            border: 1px solid #aaa;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #cce5ff;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #e6f2ff;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to SSU IoT Lab</h1>
+    
+    <h2>Registered Sensor Nodes</h2>
+    <table>
+        <tr>
+            <th>Node Name</th>
+            <th>Manufacturer</th>
+            <th>Longitude</th>
+            <th>Latitude</th>
+        </tr>
+        <?php foreach ($registerData as $row): ?>
+            <tr>
+                <td><?= htmlspecialchars($row['node_name']) ?></td>
+                <td><?= htmlspecialchars($row['manufacturer']) ?></td>
+                <td><?= htmlspecialchars($row['longitude']) ?></td>
+                <td><?= htmlspecialchars($row['latitude']) ?></td>
+            </tr>
+        <?php endforeach; ?>
+    </table>
+    
+    <h2>Data Received</h2>
+    <table>
+        <tr>
+            <th>Node Name</th>
+            <th>Time Received</th>
+            <th>Temperature</th>
+            <th>Humidity</th>
+        </tr>
+        <?php foreach ($dataResults as $row): ?>
+            <tr>
+                <td><?= htmlspecialchars($row['node_name']) ?></td>
+                <td><?= htmlspecialchars($row['time_received']) ?></td>
+                <td><?= htmlspecialchars($row['temperature']) ?></td>
+                <td><?= htmlspecialchars($row['humidity']) ?></td>
+            </tr>
+        <?php endforeach; ?>
+    </table>
+    
+    <p>The average temperature for node 1 has been: <?= round($averageResult['avg_temp'], 2) ?> C</p>
+    <p>The average humidity for node 1 has been: <?= round($averageResult['avg_humidity'], 2) ?> %</p>
+    
+    <h2>Sensor Node 1: Temperature Chart</h2>
+    <!-- code from IoTCourse GitHub -->
+    <script type="text/javascript">
+        google.charts.load('current', {'packages':['corechart']});
+        google.charts.setOnLoadCallback(drawChart);
+        
+        function drawChart() {
+            var data = google.visualization.arrayToDataTable(<?php echo $dataJSON; ?>);
+            
+            var options = {
+                title: 'Temperature vs Time',
+                vAxis: { title: 'Temperature' },
+                hAxis: { title: 'Time', slantedText: true },
+                series: {0: { pointSize: 6 }},
+                //curveType: 'function',
+                legend: { position: 'none' },
+                bar: {groupWidth: '75%' },
+                colors: ['green']   //change to green
+            };
+            
+            //var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+            var chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+            
+            
+            chart.draw(data, options);
+        }
+    </script>
+    <div id="chart_div" style="width: 800px; height: 400px;"></div>
+    
+</body>
+</html>
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+**Code to Insert Data into Webpage (db_insert.php)**
+**URL example: https://kshigemotoee.com/db_insert.php?<data>**
+<?php
+// get database credentials so you can access database
+$host = 'localhost';
+$dbname = 'u764227866_kshigemoto';
+$username = 'u764227866_db_kshigemoto';
+$password = 'ee@SSU2025';
+
+//use PDO method to access database and set error mode to catch if something goes wrong
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
+    // modification to code to handle base640-encoded data
+    //if using =data? take the base64 data, or if ?base64 then take first key which is the base64 string
+    //if none of those used --> $encodedstring is null and get data from URL in another way
+    $encodedstring = $_GET['data'] ?? array_keys($_GET)[0] ?? null;
+    if ($encodedstring) {
+        $decoded = base64_decode($encodedstring, true); //change into regular query string, check if valid
+        if ($decoded !== false) {
+            parse_str($decoded, $params);
+            // extract the parameters from decoded base64 string by turning string into array
+            $nodeID = $params['nodeID'] ?? null;        //base64 use 'nodeId' instead of 'nodeID'
+            $timeReceived = $params['timeReceived'] ?? null;
+            $nodeTemp = $params['nodeTemp'] ?? null;
+            $humidity = $params['humidity'] ?? null;
+        }
+    }
+    //if nodeID not set (base64 not found) use this code
+    if (!isset($nodeID)) {
+        //use original GET parameters -->
+        // get parameters from URL using GET method, set default value to null
+        $nodeID = $_GET['nodeID'] ?? null;
+        $timeReceived = $_GET['timeReceived'] ?? null;
+        $nodeTemp = $_GET['nodeTemp'] ?? null;
+        $humidity = $_GET['humidity'] ?? null;
+    }
+    
+    // make sure node value entered
+    if (!$nodeID) {
+        die("Missing nodeID (node_name) parameter.");
+    }
+    
+    // make sure temperature in range (-10 to 100) C
+    if ($nodeTemp !== null && ($nodeTemp < -10 || $nodeTemp > 100)) {
+        die("Temperature not within accepted range of -10 to 100 C.");
+    }
+    
+    // make sure humidity in range (0 - 100)
+    if ($humidity !== null && ($humidity < 0 || $humidity > 100)) {
+        die("Humidity not within accepted range of 0 to 100.");
+    }
+    
+    // check if node is in sensor_register table
+    $nodeCheck = $pdo->prepare("SELECT COUNT(*) FROM sensor_register WHERE node_name = :nodeID");
+    $nodeCheck->execute([':nodeID' => $nodeID]);
+        // runs the query using the value from nodeID
+    if ($nodeCheck->fetchColumn() == 0) {
+        die("Node '$nodeID' is not a registered node.");
+    }
+    //if the count is 0 that means there is no registered node because no matching node was found
+    
+    // check if time is included in URL. if equal to null then give the current timestamp
+    if (!$timeReceived) {
+        date_default_timezone_set('America/Los_Angeles');  //Pacific Time (California)
+        $timeReceived = date('Y-m-d H:i:s');
+    }
+    
+    // make sure no duplicate date for same node accepted
+    $noDuplicate = $pdo->prepare("SELECT COUNT(*) FROM sensor_data WHERE node_name = :nodeID AND time_received = :timeReceived");
+        //prepare query to count the entries for the entered node name and time
+    $noDuplicate->execute([
+        ':nodeID' => $nodeID,
+        ':timeReceived' => $timeReceived
+        ]);
+        //run the query using the entered values for time received and node ID
+    if ($noDuplicate->fetchColumn() > 0) {
+        die("Duplicate entry for node '$nodeID' at time '$timeReceived'.");
+    }
+    
+    // insert data using URL
+    $insertData = $pdo->prepare("INSERT INTO sensor_data (node_name, time_received, temperature, humidity) VALUES (:nodeID, :timeReceived, :nodeTemp, :humidity)");
+    $insertData->execute([
+        ':nodeID' => $nodeID,
+        ':timeReceived' => $timeReceived,
+        ':nodeTemp' => $nodeTemp,
+        ':humidity' => $humidity
+        ]);
+        //run the query to get the URL parameters and enter it into the data table
+    
+    //success message
+    echo "Data successfully inserted into data table for '$nodeID' at '$timeReceived'.";
+}
+//catch database errors and display the error message
+catch (PDOException $e) {
+    die("Database Error: " . $e->getMessage());
+}
+?>
