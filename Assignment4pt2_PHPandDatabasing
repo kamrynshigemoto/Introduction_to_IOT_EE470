@@ -3,9 +3,9 @@
 <?php
 // get database credentials to connect to MySQL database
 $host = 'localhost';
-$dbname = 'u764227866_kshigemoto';
-$username = 'u764227866_db_kshigemoto';
-$password = 'ee@SSU2025';
+$dbname = '--';
+$username = '--';
+$password = '--';
 
 // create PDO (php data object) to connect to database
 try {
@@ -201,9 +201,9 @@ $dataJSON = json_encode($dataArray);
 <?php
 // get database credentials so you can access database
 $host = 'localhost';
-$dbname = 'u764227866_kshigemoto';
-$username = 'u764227866_db_kshigemoto';
-$password = 'ee@SSU2025';
+$dbname = '--';
+$username = '--';
+$password = '--';
 
 //use PDO method to access database and set error mode to catch if something goes wrong
 try {
