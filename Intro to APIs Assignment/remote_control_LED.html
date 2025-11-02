@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Remote ESP LED Control</title>
+    <style>
+        body {font-family: Georgia, text-align: left, margin-top: 50px;}
+        button {padding: 12px 24px; font-size: 18px; margin: 10px;}
+        #status {margin-top: 20px; font-weight: bold;}
+    </style>
+</head>
+
+<body>
+    <h1 style="color:green;">EE 470: IoT Course</h1>
+    <button onclick="updateLED('on')">Turn ON</button>
+    <button onclick="updateLED('off')">Turn OFF</button>
+    <div id="status">Current LED status: unknown</div>
+    
+    <script>
+        const resultstxtfile = "https://kshigemotoee.com/updateLEDstatus.php";
+        
+        //LED state will either be on or off
+        function updateLED(state) {
+            fetch(resultstxtfile, {
+                method: "PUT",      //use PUT method
+                headers: {"Content-Type": "text/plain"},    //says content is plain text
+                body: state     //send on/off as content
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById("status").textContent = `LED status = ${state}`;
+                } else {
+                    document.getElementById("status").textContent = "Error: Failed to update LED status.";
+                }
+            })
+            .catch(error => {
+                document.getElementById("status").textContent = "Error: " + error;
+            });
+        }
+    </script>
+</body>
+</html>
