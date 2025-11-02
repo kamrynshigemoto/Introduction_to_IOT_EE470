@@ -1,0 +1,182 @@
+//--------------------------------------------------
+//Purpose: The purpose of this program is to control an LED remotely by using ESP8266 to check a text file that
+//         contains status of LED and RGB based on buttons pressed or slider moved on wepbage on my database. LED will be turned on/off
+//         based on what the results.txt file says. RGB intensity will change based on slider. ESP checks every 2.5 minutes or when physical button pressed.
+//Inputs: Input from button, file content (LED status) from results.txt, file content (RGB intensity) from rgbslider.txt
+//Outputs: LED (on/off), RGB intensity,serial monitor messages for debugging (wifi connectivity, led status) 
+//Date: October 31, 2025
+//Compiler: Platformio
+//Author: Kamryn Shigemoto
+//Versions:
+//          V1 - original version
+//          V2 - includes RGB
+//          V3 - includes Google Sheets
+//--------------------------------------------------
+//File Dependencies:
+//--------------------------------------------------
+// "Arduino.h" for Arduino functions, "ESP8266WiFi.h" to connect to WiFI, "ESP8266HTTPClient.h" for HTTP protocol
+//--------------------------------------------------
+//Main Program
+//--------------------------------------------------
+
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+
+#define wifi_ssid "five potatoes"
+#define wifi_password "shigeymomo31"
+#define LEDstatusURL "https://kshigemotoee.com/results.txt"
+#define RGBvalueURL "https://kshigemotoee.com/rgbslider.txt"
+#define GoogleSheetsURL "https://script.google.com/macros/s/AKfycbxRl6rsKEawrugZrk7FkCqLpkXnCge2GaQ56qlUA450_kbIxIDCFCy1UBqOVttdoy79/exec"
+
+unsigned long lastCheck = 0;    //stores the last time ESP checked for LED status
+const unsigned long checkInterval = 150000; //2.5 minutes (150,000ms)
+
+const int buttonpin = D5;   //using push button module
+const int LEDpin = D6;    
+const int redpin = D2;
+const int greenpin = D3;
+const int bluepin = D4;
+
+String LEDstatus = "unknown";
+int RGBintensity = 0;
+
+void setup() {
+  pinMode(LEDpin, OUTPUT);    //LED pin is output
+  pinMode(buttonpin, INPUT_PULLUP);   //takes button as input, enable pullup resistor
+  Serial.begin(9600);   //start serial communication
+  pinMode(redpin, OUTPUT);    //red rgb output
+  pinMode(greenpin, OUTPUT);  //green rgb output
+  pinMode(bluepin, OUTPUT);   //blue rgb output
+
+  //connect to wifi network (my hotspot)
+  WiFi.begin(wifi_ssid, wifi_password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("WiFi Connected");
+}
+
+//once ESP is connected to WiFi, check LED status
+/*
+void checkLEDstatus() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    WiFiClientSecure client;
+    client.setInsecure(); //disable certifcate check (safe for testing)
+    http.begin(client, LEDstatusURL);
+    int httpCode = http.GET();    //send GET request to results.txt
+
+    //if http code = 200 --> OK
+    if (httpCode == 200) {
+      String payload = http.getString();  //if GET successful, get results.txt content
+      payload.trim();   //get rid of extra whitespace/newline chars
+
+      if (payload == "on") {
+        digitalWrite(LEDpin, HIGH);
+        Serial.println("LED ON");
+      }
+      else if (payload == "off") {
+        digitalWrite(LEDpin, LOW);
+        Serial.println("LED OFF");
+      }
+      else {
+        Serial.println("Error: Unknown LED status " + payload);
+      }
+    }
+    else {
+      Serial.println("GET failed, code: " + String(httpCode));
+    }
+
+    http.end();
+  }
+  else {
+    Serial.println("Error: WiFi not connected");
+  }
+}
+*/
+
+//simultaneously check LED and RGB status
+void checkLEDandRGB() {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+
+    //check status of LED
+    http.begin(client, LEDstatusURL);
+    int httpCode = http.GET(); //send GET request to results.txt
+    if (httpCode == 200) {
+      LEDstatus = http.getString();
+      LEDstatus.trim();   //get rid of extra whitespace/newline chars
+      if (LEDstatus == "on") {
+        digitalWrite(LEDpin, HIGH);
+        Serial.println("LED ON");
+      }
+      else if (LEDstatus == "off") {
+        digitalWrite(LEDpin, LOW);
+        Serial.println("LED OFF");
+      }
+    } else {
+      Serial.println("Error: GET request for LED failed, code: " + String(httpCode));
+    }
+    http.end();
+
+    //check rgb value
+    http.begin(client, RGBvalueURL);
+    httpCode = http.GET();  //send GET request to rgbslider.txt
+    if (httpCode == 200) {
+      String RGBvalue = http.getString();
+      RGBvalue.trim();    //get rid of extra whitespace/newline chars
+      RGBintensity = RGBvalue.toInt(); //convert RGB value to int
+      analogWrite(redpin, RGBintensity);
+      analogWrite(greenpin, 0);
+      analogWrite(bluepin, 0);
+      Serial.println("RGB red intensity set to: " + String(RGBintensity));
+    }
+    else {
+      Serial.println("Error: GET request for RGB failed, code: " + String(httpCode));
+    }
+    http.end();
+  } else {
+    Serial.println("Error: WiFi not connected");
+  }
+}
+
+void sendtoGoogleSheets (int rgb, String led) {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+
+    String url = String(GoogleSheetsURL) + "?rgb=" + String(rgb) + "&led=" + led;
+    http.begin(client, url);
+    int httpCode = http.GET();
+
+    /*
+    if (httpCode >= 200 && httpCode < 300) {
+      Serial.println("Logged successfully in Google Sheets");
+    }
+    else {
+      Serial.println("Error: Failed to log to Google Sheets, code: " + String(httpCode));
+    }*/
+    http.end();
+  }
+}
+
+void loop() {
+  //check every 2.5 minutes
+  if (millis() - lastCheck > checkInterval) {
+    checkLEDandRGB();   //if 2.5 minutes passed, read LED status
+    lastCheck = millis();
+  }
+
+  // check if button pressed
+  if (digitalRead(buttonpin) == LOW) {
+    checkLEDandRGB();
+    sendtoGoogleSheets(RGBintensity, LEDstatus);
+    delay(500); //key debounce
+  }
+}
