@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Potentiometer + LED State</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>Potentiometer Readings (Volts vs Time)</h2>
+  <canvas id="potChart"></canvas>
+
+  <h2>LED State (On/Off vs Time)</h2>
+  <canvas id="ledChart"></canvas>
+
+  <script>
+    async function fetchData() {
+      const resp = await fetch('pot_data.php');
+      return resp.json();
+    }
+
+    function makeCharts(data) {
+      // Local timestamps
+      const potLabels = data.pot.map(r => new Date(r.ts).toLocaleString());
+      const ledLabels = data.led.map(r => new Date(r.ts).toLocaleString());
+
+      // Potentiometer chart
+      new Chart(document.getElementById('potChart'), {
+        type: 'line',
+        data: {
+          labels: potLabels,   // use local labels here
+          datasets: [{
+            label: 'Volts',
+            data: data.pot.map(r => Number(r.volts)),
+            borderColor: 'blue',
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              title: { display: true, text: 'Volts' },
+              suggestedMin: 0,
+              suggestedMax: 3.3
+            }
+          }
+        }
+      });
+
+      // LED chart
+      new Chart(document.getElementById('ledChart'), {
+        type: 'line',
+        data: {
+          labels: ledLabels,   // use local labels here
+          datasets: [{
+            label: 'LED State',
+            data: data.led.map(r => Number(r.state)),
+            borderColor: 'red',
+            stepped: true,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              title: { display: true, text: 'LED (0=OFF,1=ON)' },
+              min: 0,
+              max: 1
+            }
+          }
+        }
+      });
+    }
+
+    fetchData().then(makeCharts);
+  </script>
+</body>
+</html>
